@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Çarpım Tablosu: Ekşın Modu</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: background 0.5s ease;
+        }
+        
+        /* Normal Mod Arkaplan */
+        .normal-mode-bg {
+             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        /* Ekşın Modu Arkaplan */
+        .action-mode-bg {
+            background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        }
+
+        #timer {
+            position: absolute;
+            top: 25px;
+            right: 35px;
+            font-size: 3em;
+            font-weight: 900;
+            color: white;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+            display: none; /* Başlangıçta gizli */
+        }
+
+        #game-container {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            transition: all 0.3s ease;
+            border: 5px solid white;
+            position: relative;
+        }
+        
+        .game-header { display: flex; justify-content: space-around; align-items: center; margin-bottom: 25px; padding: 15px; background-color: #f7f7f7; border-radius: 12px; }
+        .header-item h3 { margin: 0 0 5px 0; font-size: 1em; color: #6c757d; font-weight: 700; }
+        .header-item p { margin: 0; font-size: 1.6em; font-weight: 900; color: #343a40; }
+        #piggy-bank-amount { color: #28a745; }
+        #wrong-answer-tracker { color: #dc3545; }
+
+        #question {
+            font-size: 4em;
+            font-weight: 900;
+            color: #4a4a4a;
+            margin: 30px 0;
+            letter-spacing: 5px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .end-message {
+            font-size: 3.5em !important;
+        }
+
+        #answer-input { width: 180px; padding: 15px; font-size: 2.5em; font-family: 'Nunito', sans-serif; font-weight: 900; text-align: center; border: 3px solid #ccc; border-radius: 10px; outline: none; transition: all 0.3s ease; }
+        #answer-input:focus { border-color: #764ba2; transform: scale(1.05); }
+
+        .btn { padding: 15px 30px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; margin: 5px; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        #restart-btn { background-color: #6c757d; }
+        #restart-btn:hover { background-color: #5a6268; }
+        #cash-out-btn { background-color: #fd7e14; }
+        #cash-out-btn:hover { background-color: #e66a00; }
+        #action-mode-btn { background-color: #8e44ad; } /* Mor buton */
+        #action-mode-btn:hover { background-color: #732d91; }
+        
+        .button-group { margin-top: 25px; display: flex; flex-wrap: wrap; justify-content: center; }
+
+        #feedback { font-size: 1.6em; font-weight: 700; height: 60px; margin-top: 20px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .feedback-main { transition: transform 0.2s ease; }
+        .feedback-penalty { font-size: 0.7em; color: #dc3545; margin-top: 5px; }
+        .correct .feedback-main { color: #28a745; transform: scale(1.1); }
+        .wrong .feedback-main { color: #dc3545; transform: scale(1.1); }
+
+    </style>
+</head>
+<body class="normal-mode-bg">
+
+    <div id="timer">20</div>
+
+    <div id="game-container">
+        <div class="game-header">
+            <div class="header-item">
+                <h3>YANLIŞ SAYACI</h3>
+                <p id="wrong-answer-tracker">0 / 3</p>
+            </div>
+            <div class="header-item">
+                <h3>💰 KUMBARAM</h3>
+                <p id="piggy-bank-amount">0.00 TL</p>
+            </div>
+        </div>
+        
+        <div id="question">5 x 8</div>
+        <input type="number" id="answer-input" autofocus autocomplete="off">
+        <div id="feedback"></div>
+        
+        <div class="button-group">
+            <button id="action-mode-btn" class="btn">🚀 Ekşın Modu</button>
+            <button id="cash-out-btn" class="btn">Paralar Tahsil Edildi!</button>
+            <button id="restart-btn" class="btn">Yeni Oturum</button>
+        </div>
+    </div>
+
+    <script>
+        const body = document.body;
+        const timerText = document.getElementById('timer');
+        const questionText = document.getElementById('question');
+        const answerInput = document.getElementById('answer-input');
+        const feedbackText = document.getElementById('feedback');
+        const piggyBankAmountText = document.getElementById('piggy-bank-amount');
+        const wrongAnswerTrackerText = document.getElementById('wrong-answer-tracker');
+        const cashOutBtn = document.getElementById('cash-out-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const actionModeBtn = document.getElementById('action-mode-btn');
+        const buttonGroup = document.querySelector('.button-group');
+        const gameHeader = document.querySelector('.game-header');
+
+        // Oyun Değişkenleri
+        let num1, num2, correctAnswer, piggyBankTotal = 0, wrongAnswerCount = 0;
+        const rewardPerCorrectAnswer = 0.1, penaltyAmount = 0.1, wrongAnswersForPenalty = 3;
+        
+        // Ekşın Modu Değişkenleri
+        let isActionModeActive = false, actionModeCorrectAnswers = 0, timerId, timeLeft = 20;
+        const actionTime = 20, actionCorrectGoal = 10, actionReward = 5;
+
+        function initialize() {
+            piggyBankTotal = parseFloat(localStorage.getItem('piggyBankTotal')) || 0;
+            wrongAnswerCount = parseInt(localStorage.getItem('wrongAnswerCount')) || 0;
+            updateDisplays();
+            generateQuestion();
+        }
+
+        function generateQuestion() {
+            feedbackText.innerHTML = '';
+            answerInput.value = '';
+            if(!isActionModeActive) { // Sadece normal modda sayacı sıfırla
+                 questionText.classList.remove('end-message');
+                 answerInput.disabled = false;
+                 answerInput.focus();
+            }
+            num1 = Math.floor(Math.random() * 10) + 1;
+            num2 = Math.floor(Math.random() * 10) + 1;
+            correctAnswer = num1 * num2;
+            questionText.textContent = `${num1} x ${num2}`;
+        }
+
+        function checkAnswer() {
+            if (isActionModeActive) { checkAnswerActionMode(); return; }
+
+            const userAnswer = parseInt(answerInput.value);
+            if (isNaN(userAnswer)) return;
+
+            if (userAnswer === correctAnswer) {
+                handleFeedback(true, `Harika! 🎉`);
+                piggyBankTotal += rewardPerCorrectAnswer;
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            } else {
+                handleFeedback(false, `Doğrusu ${correctAnswer} olacaktı.`);
+                wrongAnswerCount++;
+                if (wrongAnswerCount >= wrongAnswersForPenalty) {
+                    piggyBankTotal = Math.max(0, piggyBankTotal - penaltyAmount);
+                    wrongAnswerCount = 0;
+                    feedbackText.innerHTML += `<span class="feedback-penalty">3 yanlış! Kumbaradan ${penaltyAmount.toFixed(2)} TL düştü!</span>`;
+                }
+            }
+            updateAndSave();
+            answerInput.disabled = true;
+            setTimeout(() => { answerInput.disabled = false; generateQuestion(); }, 1500);
+        }
+        
+        function handleFeedback(isCorrect, message){
+            feedbackText.innerHTML = `<span class="feedback-main">${message}</span>`;
+            feedbackText.className = isCorrect ? 'correct' : 'wrong';
+        }
+
+        // --- EKŞIN MODU FONKSİYONLARI ---
+
+        function startActionMode() {
+            isActionModeActive = true;
+            actionModeCorrectAnswers = 0;
+            timeLeft = actionTime;
+
+            // Arayüzü Değiştir
+            body.classList.remove('normal-mode-bg');
+            body.classList.add('action-mode-bg');
+            timerText.style.display = 'block';
+            timerText.textContent = timeLeft;
+            buttonGroup.style.display = 'none';
+            gameHeader.style.visibility = 'hidden';
+            feedbackText.innerHTML = '';
+            answerInput.disabled = false;
+            answerInput.focus();
+
+            generateQuestion();
+            timerId = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            timeLeft--;
+            timerText.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                endActionMode(false); // Süre bitti, başarısız.
+            }
+        }
+
+        function checkAnswerActionMode() {
+            const userAnswer = parseInt(answerInput.value);
+
+            if (isNaN(userAnswer) || userAnswer !== correctAnswer) {
+                // Yanlış cevap veya geçersiz giriş anında bitirir.
+                endActionMode(false);
+                return;
+            }
+
+            // Doğru cevap
+            actionModeCorrectAnswers++;
+            answerInput.value = ''; // Hızla yeni cevaba geçmek için
+            
+            if (actionModeCorrectAnswers >= actionCorrectGoal) {
+                endActionMode(true); // Hedefe ulaşıldı, başarılı.
+            } else {
+                generateQuestion();
+            }
+        }
+
+        function endActionMode(isSuccess) {
+            clearInterval(timerId);
+            isActionModeActive = false;
+            answerInput.disabled = true;
+            timerText.style.display = 'none';
+
+            if (isSuccess) {
+                questionText.textContent = "Yaptın Kanka!!";
+                questionText.classList.add('end-message');
+                piggyBankTotal += actionReward;
+                updateAndSave();
+                // Büyük konfeti patlaması
+                const duration = 3 * 1000;
+                const end = Date.now() + duration;
+                (function frame() {
+                    confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
+                    confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                    if (Date.now() < end) { requestAnimationFrame(frame); }
+                }());
+            } else {
+                questionText.textContent = "Aynen Kanka";
+                questionText.classList.add('end-message');
+            }
+            
+            // Arayüzü normale döndür
+            setTimeout(() => {
+                body.classList.remove('action-mode-bg');
+                body.classList.add('normal-mode-bg');
+                buttonGroup.style.display = 'flex';
+                gameHeader.style.visibility = 'visible';
+                initialize(); // Oyunu normal modda yeniden başlatır
+            }, 4000); // 4 saniye sonucu göster
+        }
+
+        // --- YARDIMCI FONKSİYONLAR ---
+
+        function updateAndSave() {
+            localStorage.setItem('piggyBankTotal', piggyBankTotal.toString());
+            localStorage.setItem('wrongAnswerCount', wrongAnswerCount.toString());
+            updateDisplays();
+        }
+
+        function updateDisplays() {
+            piggyBankAmountText.textContent = `${piggyBankTotal.toFixed(2)} TL`;
+            wrongAnswerTrackerText.textContent = `${wrongAnswerCount} / ${wrongAnswersForPenalty}`;
+        }
+        
+        function cashOut() {
+            if (piggyBankTotal > 0) {
+                alert(`Tebrikler! ${piggyBankTotal.toFixed(2)} TL kumbaradan alındı. Şimdi yeni hedefler için biriktirme zamanı!`);
+                piggyBankTotal = 0;
+                updateAndSave();
+            } else {
+                alert('Kumbara zaten boş!');
+            }
+        }
+
+        // Olay Dinleyicileri
+        answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
+        actionModeBtn.addEventListener('click', startActionMode);
+        cashOutBtn.addEventListener('click', cashOut);
+        restartBtn.addEventListener('click', () => {
+            if (confirm('Mevcut yanlış sayacını sıfırlayıp yeni bir oturum başlatmak istiyor musun? (Kumbara etkilenmez)')) {
+                wrongAnswerCount = 0;
+                updateAndSave();
+                generateQuestion();
+            }
+        });
+        
+        initialize();
+    </script>
+</body>
+</html>
